@@ -53,7 +53,6 @@ def plot_values(x,y,text,color_used='blue',):
     plt.title(text[2])
     print("columns: ", np.size(x))
     plt.plot(x, y, marker='o', label=text[3], color=color_used)
-    plt.figure(figsize=(7,7))
     plt.legend()
 def IQR_outliers(df, target_col):
     '''

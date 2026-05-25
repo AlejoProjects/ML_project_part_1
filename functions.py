@@ -1,7 +1,9 @@
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.model_selection import train_test_split
 from statsmodels.stats.stattools import durbin_watson
-#from pyexpat import model
+from sklearn.impute import IterativeImputer
 from matplotlib import pyplot as plt
 import statsmodels.stats.api as sms
 import statsmodels.api as sm
@@ -9,6 +11,7 @@ import scipy.stats as stats
 import numpy as np
 import pandas as pd
 import seaborn as sns  
+#from pyexpat import model
 
 
 
@@ -51,7 +54,35 @@ def plot_values(x,y,text,color_used='blue'):
     print("columns: ", np.size(x))
     plt.plot(x, y, marker='o', label=text[3], color=color_used)
     plt.legend()
+def IQR_outliers(df, target_col):
+    '''
+    This function identifies and removes outliers from a specified target column in a DataFrame using the Interquartile Range (IQR) method.
+    param df: The input DataFrame containing the data.
+    param target_col: The name of the target column from which to remove outliers.
+    
+    '''
+    # 1. Calculamos el primer (Q1) y tercer cuartil (Q3)
+    Q1 = df[target_col].quantile(0.25)
+    Q3 = df[target_col].quantile(0.75)
 
+    # 2. Calculamos el Rango Intercuartílico (IQR)
+    IQR = Q3 - Q1
+
+    # 3. Definimos los límites inferior y superior
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    # 4. Creamos un nuevo DataFrame filtrando las anomalías
+    df_clean = df[(df[target_col] >= lower_bound) & (df[target_col] <= upper_bound)]
+
+    # Mostramos los resultados del filtrado
+    print(f"Límite inferior aceptado: {lower_bound:.2f}")
+    print(f"Límite superior aceptado: {upper_bound:.2f}")
+    print(f"Tamaño original del dataset: {len(df)} muestras")
+    print(f"Tamaño después de aplicar IQR: {len(df_clean)} muestras")
+    print(f"Se removieron {len(df) - len(df_clean)} valores atípicos.")
+    
+    return df_clean
 def sort_values(sk,ku):
     skewness_sort = sk.sort_values(ascending=False)
     kurtosis_sort = ku.sort_values(ascending=False)
@@ -110,6 +141,28 @@ def mean_imputation(df, columns):
 def median_imputation(df, columns):
     df[columns] = df[columns].fillna(df[columns].median())
     return df
+def iterative_imputation(df, target_col, max_iter=10):
+    '''
+    Perform iterative imputation on the features of a DataFrame while keeping the target column intact.
+    param df: The input DataFrame containing the data.
+    param target_col: The name of the target column that should not be imputed.
+    param max_iter: The maximum number of imputation rounds to perform (default is 10).
+    '''
+    
+    print("Starting Iterative Imputation (this may take a moment)...")
+    X = df.drop(target_col, axis=1)
+    Y = df[target_col]
+    
+    imputer = IterativeImputer(random_state=42, max_iter=max_iter)
+    X_imputed_array = imputer.fit_transform(X)
+    
+    # Convert back to DataFrame
+    X_imputed = pd.DataFrame(X_imputed_array, columns=X.columns)
+    
+    print("Remaining nulls after imputation:", X_imputed.isna().sum().sum())
+    
+    return X_imputed, Y
+
 def evaluate_model(model, X_test, Y_test, model_name):
     '''
     Evaluate the performance of a regression model using RMSE, MAE, and R^2 metrics.
@@ -267,4 +320,45 @@ def check_regularized_residuals(model, X_test, Y_test, model_name="Model"):
     ax[1].set_title(f"Q-Q Plot of Residuals ({model_name})")
     
     plt.tight_layout()
+    plt.show()
+def multiple_model_diagnostics(models, X_test_scaled, Y_test):
+    '''
+    this function takes a dictionary of fitted regression models and performs a visual diagnostic check for each model by plotting the actual vs. predicted values for the test set.
+    param models: A dictionary where keys are model names (strings) and values are fitted regression
+    model objects (must have a .predict method).
+    param X_test_scaled: The test set features, already scaled if necessary.
+    '''
+    colors = ['teal', 'blue', 'green']  # Add more colors if you have more models
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+    print("--- RENDIMIENTO EN EL SPLIT LOCAL (80-20) ---")
+    for i, (name, model) in enumerate(models.items()):
+        preds = model.predict(X_test_scaled)
+        # Gráfico de Valores Reales vs Predichos
+        sns.scatterplot(x=Y_test, y=preds, ax=axes[i], alpha=0.5, color=colors[i])
+        axes[i].plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 'r--', lw=2) # Línea ideal
+        axes[i].set_title(f'{name})')
+        axes[i].set_xlabel('Actual cfinal (Kelvin)')
+        if i == 0: axes[i].set_ylabel('Predicted cfinal (Kelvin)')
+
+    plt.suptitle("Diagnóstico de Regresión: Valores Reales vs Predichos (Test Set)", fontsize=14, y=1.05)
+    plt.tight_layout()
+    plt.show()
+def simple_testing(model, X_test_scaled, Y_test,color_used='teal'):
+    '''
+    Función para realizar un test simple de predicciones vs valores reales y graficar los resultados.
+    params model: modelo entrenado (debe tener el método .predict)
+    params X_test_scaled: conjunto de características de prueba ya escalado
+    params Y_test: valores reales del conjunto de prueba
+    '''
+    model_test = model.predict(X_test_scaled)
+    model_ev = r2_score(Y_test, model_test)
+    plt.figure(figsize=(7, 5))
+    sns.scatterplot(x=Y_test, y=model_test, alpha=0.6, color=color_used, edgecolor='k')
+    # Línea de identidad ideal (Donde caerían las predicciones perfectas)
+    plt.plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 'r--', lw=2, label='Predicción Perfecta')
+    plt.title(f'Split Local 80-20: Valor Real vs. Predicho ({model.__class__.__name__})\n$R^2 = {model_ev:.3f}$')
+    plt.xlabel('Valor Real de cfinal (Kelvin)')
+    plt.ylabel('Valor Predicho por el Modelo (Kelvin)')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.5)
     plt.show()

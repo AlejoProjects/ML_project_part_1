@@ -22,7 +22,7 @@ def eda_info(column,column_name):
     print("\n--- Statistical Summary of " + column_name + " ---")
     print("\nSkewness:",column.skew())
     print("Kurtosis:", column.kurtosis())
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(5, 4))
     # Histogram and KDE (Kernel Density Estimate)
     sns.histplot(column, bins=50, kde=True, color='purple', edgecolor='black')
     plt.title(column_name, fontsize=16)
@@ -40,7 +40,7 @@ def total_eda_info(df):
         column = df.iloc[:, i]
         eda_info(column,column_names[i]) 
 
-def plot_values(x,y,text,color_used='blue'):
+def plot_values(x,y,text,color_used='blue',):
     '''
     Plot the relationship between two variables with a line plot.
     param x: The independent variable (x-axis).
@@ -53,6 +53,7 @@ def plot_values(x,y,text,color_used='blue'):
     plt.title(text[2])
     print("columns: ", np.size(x))
     plt.plot(x, y, marker='o', label=text[3], color=color_used)
+    plt.figure(figsize=(7,7))
     plt.legend()
 def IQR_outliers(df, target_col):
     '''

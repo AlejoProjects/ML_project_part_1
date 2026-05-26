@@ -1,8 +1,12 @@
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.model_selection import train_test_split
 from statsmodels.stats.stattools import durbin_watson
+from sklearn.neural_network import MLPRegressor
 from sklearn.impute import IterativeImputer
 from matplotlib import pyplot as plt
 import statsmodels.stats.api as sms
@@ -40,19 +44,19 @@ def total_eda_info(df):
         column = df.iloc[:, i]
         eda_info(column,column_names[i]) 
 
-def plot_values(x,y,text,color_used='blue',):
+def plot_values(x_arr,y_arr,text,color_used='blue',):
     '''
     Plot the relationship between two variables with a line plot.
-    param x: The independent variable (x-axis).
-    param y: The dependent variable (y-axis).
+    param x_arr: A list of independent variables (x-axis).
+    param y_arr: A list of dependent variables (y-axis).
     param text: A list containing labels for x, y, and the title.
     param color_used: The color to use for the plot.
     '''
     plt.xlabel(text[0])
     plt.ylabel(text[1])
     plt.title(text[2])
-    print("columns: ", np.size(x))
-    plt.plot(x, y, marker='o', label=text[3], color=color_used)
+    for i in x_arr:
+      plt.plot(i, y_arr[x_arr.index(i)], marker='o', label=text[3], color=color_used)
     plt.legend()
 def IQR_outliers(df, target_col):
     '''
@@ -162,6 +166,16 @@ def iterative_imputation(df, target_col, max_iter=10):
     print("Remaining nulls after imputation:", X_imputed.isna().sum().sum())
     
     return X_imputed, Y
+
+
+def scale_data(X_vals,scaler_type='robust'):
+    if scaler_type == 'robust':
+        scaler = RobustScaler()
+    elif scaler_type == 'standard':
+        scaler = StandardScaler()
+    elif scaler_type == 'minmax':
+        scaler = MinMaxScaler()
+    return scaler.fit_transform(X_vals)
 
 def evaluate_model(model, X_test, Y_test, model_name):
     '''
@@ -362,3 +376,23 @@ def simple_testing(model, X_test_scaled, Y_test,color_used='teal'):
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.show()
+def test_mlp_regressor(data,hidden_layers = (512,256,128,64),learning_rate=0.001):
+        X_train_scaled, Y_train, X_test_scaled, Y_test = data
+        nn = MLPRegressor(
+        hidden_layer_sizes=hidden_layers, # 3 capas ocultas
+        activation='relu',                 # función de activación
+        solver='adam',                     # algoritmo de optimización
+        alpha=0.01,                       # regularización L2
+        learning_rate_init=learning_rate,          # tasa de aprendizaje inicial
+        max_iter=500,                      # máximo de epoch
+        early_stopping=True,               # parar si no mejora
+        validation_fraction=0.15,          # % de train para validación
+        n_iter_no_change=20,               # epoch sin mejora para parar
+        random_state=42,
+        verbose=True                       # ver el progreso
+        )
+        nn.fit(X_train_scaled, Y_train)
+        nn_preds = nn.predict(X_test_scaled)
+        nn_mse, nn_mae, nn_r2 = f.evaluate_model(nn, X_test_scaled, Y_test, "MLP Regressor")
+        print(f"MLP Regressor - MSE: {nn_mse:.4f}, MAE: {nn_mae:.4f}, R²: {nn_r2:.4f}")
+        return nn,nn_preds

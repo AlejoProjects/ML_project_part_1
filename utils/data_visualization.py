@@ -56,8 +56,24 @@ def model_testing_visualization(model, X_test_scaled, Y_test,color_used = 'teal'
     plt.figure(figsize=(7, 5))
     sns.scatterplot(x=Y_test, y=predictions, alpha=0.6, color=color_used, edgecolor='k')
     # Ideal identity line (where perfect predictions would fall)
+    plt.plot()
     plt.plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 'r--', lw=2, label='Perfect Prediction')
     plt.title(f'Actual vs. Predicted Values ({model.__class__.__name__})')
+    plt.xlabel('Actual Values (Kelvin)')
+    plt.ylabel('Predicted Values (Kelvin)')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.show()
+def multiple_testing_visualization(models,X_tests,Y_tests,labels,colors):
+    for i,mo in enumerate(models):
+        predictions = mo.predict(X_tests[i])
+        plt.figure(figsize=(7, 5))
+        sns.scatterplot(x=Y_tests[i], y=predictions, alpha=0.6, color=colors[i], edgecolor='k',label= labels[i])
+        plt.plot([Y_tests[i].min(), Y_tests[i].max()], [Y_tests[i].min(), Y_tests[i].max()], 'r--', lw=2, label='Perfect Prediction')
+        # Ideal identity line (where perfect predictions would fall)
+    plt.plot()
+   
+    plt.title(f'Actual vs. Predicted Values ({mo.__class__.__name__})')
     plt.xlabel('Actual Values (Kelvin)')
     plt.ylabel('Predicted Values (Kelvin)')
     plt.legend()
@@ -83,4 +99,15 @@ def multiple_model_diagnostics(models, X_test_scaled, Y_test):
         if i == 0: axes[i].set_ylabel('Predicted cfinal (Kelvin)')
     plt.suptitle("Diagnóstico de Regresión: Valores Reales vs Predichos (Test Set)", fontsize=14, y=1.05)
     plt.tight_layout()
+    plt.show()
+def correlation_matrix(dvalues,features,threshold):
+    corr_matrix_full = dvalues.corr()
+    plt.figure(figsize=(15, 10))
+    keep_cols = list(features) + ['cfinal']
+    sns.heatmap(corr_matrix_full.loc[keep_cols, keep_cols], 
+            annot=False, 
+            cmap='coolwarm', 
+            fmt=".2f")
+    plt.title(f'Correlation Matrix of Selected Features (Absolute Correlation >= {threshold})')
+    plt.tight_layout() 
     plt.show()

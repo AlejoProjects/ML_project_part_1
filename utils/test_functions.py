@@ -153,7 +153,50 @@ def evaluate_model(model, X_test, Y_test, model_name):
     print(f"{model_name} R^2:  {r2:.3f}\n")
     return rmse, mae, r2
 
+def top_coefficients(features,models):
+
+# Unir coeficientes en un DataFrame para compararlos
+    coef_df = pd.DataFrame({
+        'Feature': features,
+        'OLS_Coef': models['u_model'].coef_,
+        'Ridge_Coef': models['r_model'].coef_,
+        'Lasso_Coef': models['l_model'].coef_
+    })
    
+
+    coef_df['OLS_abs'] = coef_df['OLS_Coef'].abs()
+    coef_df['ridge_abs'] = coef_df['Ridge_Coef'].abs()
+    coef_df['lasso_abs'] = coef_df['Lasso_Coef'].abs()
+    top_5_ols = coef_df.sort_values(by='OLS_abs', ascending=False).head(5)
+    top_5_ridge = coef_df.sort_values(by='ridge_abs', ascending=False).head(5)
+    top_5_lasso = coef_df.sort_values(by='lasso_abs', ascending=False).head(5)
+
+    print("Top 5 largest coefficients (Unregularized OLS):")
+    print(top_5_ols[['Feature', 'OLS_Coef']])
+
+    print("Top 5 largest coefficients (Ridge):")
+    print(top_5_ridge[['Feature', 'Ridge_Coef']])
+
+    print("Top 5 largest coefficients (Lasso):")
+    print(top_5_lasso[['Feature', 'Lasso_Coef']])
+
+    print("--- 5. Feature Selection (Lasso) ---")
+    dropped_features = coef_df[coef_df['Lasso_Coef'] == 0]['Feature'].tolist()
+    print(f"Lasso dropped {len(dropped_features)} features.")
+    for feature in features:
+        if feature in coef_df['Feature'].values:
+            val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
+            if val == 0:
+                print(f"-> {feature} fue eliminada (coef = 0). Físicamente, esto sugiere que no tiene poder predictivo o es redundante para predecir la temperatura crítica.")
+            else:
+                print(f"-> {feature} se mantuvo con un coeficiente de {val:.4f}.") 
+    for feature in ['ril', 'msqv']:
+        if feature in coef_df['Feature'].values:
+            val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
+            if val == 0:
+                print(f"-> {feature} fue eliminada (coef = 0). Físicamente, esto sugiere que no tiene poder predictivo o es redundante para predecir la temperatura crítica.")
+            else:
+                print(f"-> {feature} se mantuvo con un coeficiente de {val:.4f}.") 
 def simple_testing(model, X_test_scaled, Y_test,cu='teal'):
     '''
     Función para realizar un test simple de predicciones vs valores reales y graficar los resultados.

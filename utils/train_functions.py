@@ -128,7 +128,6 @@ def iterative_imputation(df, target_col, max_iter=10):
     
     return X_imputed, Y
 
-
 def scale_data(X_vals,scaler_type='robust'):
     if scaler_type == 'robust':
         scaler = RobustScaler()

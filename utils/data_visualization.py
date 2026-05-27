@@ -45,31 +45,34 @@ def linearity_check(u_model, X_test, Y_test):
     plt.xlabel('Fitted Values (Predictions)')
     plt.ylabel('Residuals')
     plt.show()
-def model_testing_visualization(model, X_test_scaled, Y_test,color_used = 'teal'):
+def model_testing_visualization(model, X_test_scaled, Y_test, color_used='teal', ax=None):
     '''
     Visualize the performance of a regression model by plotting predicted vs. actual values.
-    param model: The trained regression model (must have a .predict method).
-    param X_test_scaled: The scaled test set features.
-    param Y_test: The actual target values for the test set.
+    Accepts an 'ax' parameter to allow plotting multiple models in subplots.
     '''
     predictions = model.predict(X_test_scaled)
-    plt.figure(figsize=(7, 5))
-    sns.scatterplot(x=Y_test, y=predictions, alpha=0.6, color=color_used, edgecolor='k')
+    
+    # If no axis is provided, create a standalone plot
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(7, 5))
+        
+    ax.scatter(Y_test, predictions, alpha=0.6, color=color_used, edgecolor='k')
+    
+    # Removed the empty plt.plot() that was doing nothing
     # Ideal identity line (where perfect predictions would fall)
-    plt.plot()
-    plt.plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 'r--', lw=2, label='Perfect Prediction')
-    plt.title(f'Actual vs. Predicted Values ({model.__class__.__name__})')
-    plt.xlabel('Actual Values (Kelvin)')
-    plt.ylabel('Predicted Values (Kelvin)')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.show()
+    ax.plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 'r--', lw=2, label='Perfect Prediction')
+    
+    ax.set_title(f'Actual vs. Predicted ({model.__class__.__name__})')
+    ax.set_xlabel('Actual Values (Kelvin)')
+    ax.set_ylabel('Predicted Values (Kelvin)')
+    ax.legend()
+    ax.grid(True, linestyle='--', alpha=0.5)
 def multiple_testing_visualization(models,X_tests,Y_tests,labels,colors):
     for i,mo in enumerate(models):
         predictions = mo.predict(X_tests[i])
         plt.figure(figsize=(7, 5))
         sns.scatterplot(x=Y_tests[i], y=predictions, alpha=0.6, color=colors[i], edgecolor='k',label= labels[i])
-        plt.plot([Y_tests[i].min(), Y_tests[i].max()], [Y_tests[i].min(), Y_tests[i].max()], 'r--', lw=2, label='Perfect Prediction')
+        sns.scatterplot([Y_tests[i].min(), Y_tests[i].max()], [Y_tests[i].min(), Y_tests[i].max()], 'r--', lw=2, label='Perfect Prediction')
         # Ideal identity line (where perfect predictions would fall)
     plt.plot()
    
@@ -111,3 +114,23 @@ def correlation_matrix(dvalues,features,threshold):
     plt.title(f'Correlation Matrix of Selected Features (Absolute Correlation >= {threshold})')
     plt.tight_layout() 
     plt.show()
+def pca_visualization(pca_df,ev_vis):
+    plt.figure(figsize=(10, 8))
+    # Using a scatterplot colored by the target variable (cfinal)
+    scatter = sns.scatterplot(
+        x='PC1', y='PC2', 
+        hue='cfinal', 
+        palette='viridis', 
+        data=pca_df, 
+        alpha=0.6,
+        edgecolor=None
+    )
+    plt.title('2D PCA of Superconductor Data (Colored by Critical Temp)')
+    plt.xlabel(f'Principal Component 1 ({ev_vis[0]:.2%} variance)')
+    plt.ylabel(f'Principal Component 2 ({ev_vis[1]:.2%} variance)')
+    # Move legend out of the way
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='cfinal')
+    plt.tight_layout()
+    plt.show()
+# Instead of 2 components, let's let PCA pick the number of components 
+#  needed to explain 95% of the variance in the data.

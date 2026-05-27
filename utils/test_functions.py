@@ -1,11 +1,10 @@
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.model_selection import train_test_split
-from .data_visualization import linearity_check
 from .data_visualization import model_testing_visualization
 from statsmodels.stats.stattools import durbin_watson
 from sklearn.neural_network import MLPRegressor
-from sklearn.impute import IterativeImputer
+from .data_visualization import linearity_check
+from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 import statsmodels.stats.api as sms
 import statsmodels.api as sm
@@ -30,7 +29,6 @@ def residual_independence_test(u_model, X_test, Y_test):
     else:
         print("Result: Potential autocorrelation detected (Bad).")
     print("\n" + "="*80 + "\n")
-
 def homoscedasticity_test(u_model, X_test, Y_test):
     '''
     check for homoscedasticity using the Breusch-Pagan test, which tests whether the variance of the residuals is constant across all levels of the independent variables.
@@ -50,7 +48,6 @@ def homoscedasticity_test(u_model, X_test, Y_test):
     else:
         print("Result: Evidence of heteroscedasticity found (Bad).")
     print("\n" + "="*80 + "\n")
-
 def normality_test(u_model, X_test, Y_test):
     '''
     check for normality of residuals using a Q-Q plot and the Jarque-Bera test.
@@ -72,7 +69,6 @@ def normality_test(u_model, X_test, Y_test):
     else:
         print("Result: Residuals may not be normally distributed (Bad).")
     print("\n" + "="*80 + "\n")
-
 def multicollinearity_test(X):
     '''
     check for multicollinearity using Variance Inflation Factor (VIF).
@@ -94,7 +90,6 @@ def multicollinearity_test(X):
     else:
         print("\nResult: Potential multicollinearity detected (Bad).")
     print("\n" + "="*80 + "\n")
-
 def tests_check(u_model, X_test, Y_test):
     '''
     Run all diagnostic tests for the OLS regression model.
@@ -152,7 +147,26 @@ def evaluate_model(model, X_test, Y_test, model_name):
     print(f"{model_name} MAE:  {mae:.3f}")
     print(f"{model_name} R^2:  {r2:.3f}\n")
     return rmse, mae, r2
-
+def dropped_features_search(coef_df,features):
+        '''
+        Prints the dropped features after the lasso trainning 
+        param coef_df: the dataFrame containning the coefficients 
+        param features: the features of the dataFrame
+        
+        '''
+        dropped_features = coef_df[coef_df['Lasso_Coef'] <= abs(0.01)]['Feature'].tolist()
+        print(f"Lasso dropped {len(dropped_features)} features.")
+        for feature in features:
+            if feature in coef_df['Feature'].values:
+                val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
+                if val == 0:
+                    print(f"-> {feature} was deleted (coef = 0). It's redundant to predict critical temperature.")
+                
+        for feature in ['ril', 'msqv']:
+            if feature in coef_df['Feature'].values:
+                val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
+                if val == 0:
+                    print(f"-> {feature} was deleted (coef = 0). It's redundant to predict critical temperature.")               
 def top_coefficients(features,models):
 
 # Unir coeficientes en un DataFrame para compararlos
@@ -181,22 +195,7 @@ def top_coefficients(features,models):
     print(top_5_lasso[['Feature', 'Lasso_Coef']])
 
     print("--- 5. Feature Selection (Lasso) ---")
-    dropped_features = coef_df[coef_df['Lasso_Coef'] == 0]['Feature'].tolist()
-    print(f"Lasso dropped {len(dropped_features)} features.")
-    for feature in features:
-        if feature in coef_df['Feature'].values:
-            val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
-            if val == 0:
-                print(f"-> {feature} fue eliminada (coef = 0). Físicamente, esto sugiere que no tiene poder predictivo o es redundante para predecir la temperatura crítica.")
-            else:
-                print(f"-> {feature} se mantuvo con un coeficiente de {val:.4f}.") 
-    for feature in ['ril', 'msqv']:
-        if feature in coef_df['Feature'].values:
-            val = coef_df.loc[coef_df['Feature'] == feature, 'Lasso_Coef'].values[0]
-            if val == 0:
-                print(f"-> {feature} fue eliminada (coef = 0). Físicamente, esto sugiere que no tiene poder predictivo o es redundante para predecir la temperatura crítica.")
-            else:
-                print(f"-> {feature} se mantuvo con un coeficiente de {val:.4f}.") 
+    dropped_features_search(coef_df,features)   
 def simple_testing(model, X_test_scaled, Y_test,cu='teal'):
     '''
     Función para realizar un test simple de predicciones vs valores reales y graficar los resultados.
@@ -208,24 +207,83 @@ def simple_testing(model, X_test_scaled, Y_test,cu='teal'):
     model_ev = r2_score(Y_test, model_test)
     model_testing_visualization(model, X_test_scaled, Y_test,color_used = cu)
     print(f"R² del modelo: {model_ev:.4f}")
-
+def multiple_simple_testing(models_list, X_test_scaled, Y_test, colors_arr):
+    '''
+    Test and plot multiple models side-by-side.
+    params models_list: List of trained models
+    params X_test_scaled: Scaled test features
+    params Y_test: Actual target values
+    params colors_arr: List of colors corresponding to each model
+    '''
+    n_models = len(models_list)
+    # Create a grid of subplots dynamically based on the number of models
+    fig, axes = plt.subplots(1, n_models, figsize=(6 * n_models, 5))
+    if n_models == 1:
+        axes = [axes] 
+    for idx, (model, color) in enumerate(zip(models_list, colors_arr)):
+        # Calculate R2
+        model_test = model.predict(X_test_scaled)
+        model_ev = r2_score(Y_test, model_test)
+        print(f"R² del modelo {model.__class__.__name__}: {model_ev:.4f}")
+        model_testing_visualization(model, X_test_scaled, Y_test, color_used=color, ax=axes[idx])  
+    plt.tight_layout()
+    plt.show()
 def test_mlp_regressor(data,hidden_layers = (512,256,128,64),learning_rate=0.001):
         X_train_scaled, Y_train, X_test_scaled, Y_test = data
         nn = MLPRegressor(
-        hidden_layer_sizes=hidden_layers, # 3 capas ocultas
-        activation='relu',                 # función de activación
-        solver='adam',                     # algoritmo de optimización
+        hidden_layer_sizes=hidden_layers,
+        activation='relu',                
+        solver='adam',                    
         alpha=0.01,                       # regularización L2
-        learning_rate_init=learning_rate,          # tasa de aprendizaje inicial
-        max_iter=500,                      # máximo de epoch
-        early_stopping=True,               # parar si no mejora
-        validation_fraction=0.15,          # % de train para validación
-        n_iter_no_change=20,               # epoch sin mejora para parar
+        learning_rate_init=learning_rate, 
+        max_iter=500,                    
+        early_stopping=True,               
+        validation_fraction=0.15,          # % of train for validation
+        n_iter_no_change=20,          
         random_state=42,
-        verbose=True                       # ver el progreso
+        verbose=True                     
         )
         nn.fit(X_train_scaled, Y_train)
         nn_preds = nn.predict(X_test_scaled)
         nn_mse, nn_mae, nn_r2 = evaluate_model(nn, X_test_scaled, Y_test, "MLP Regressor")
         print(f"MLP Regressor - MSE: {nn_mse:.4f}, MAE: {nn_mae:.4f}, R²: {nn_r2:.4f}")
         return nn,nn_preds
+def plot_overlapping_models(models, X_test, Y_test, labels, colors):
+    '''
+    Overlaps actual vs predicted scatter plots for multiple models on ONE single graph.
+    '''
+    plt.figure(figsize=(10, 8))
+    
+    # 1. Plot the "Perfect Prediction" reference line (y = x) first
+    plt.plot([Y_test.min(), Y_test.max()], [Y_test.min(), Y_test.max()], 
+             'r--', lw=2, label='Perfect Prediction (y=x)')
+    
+    # 2. Loop through each model and overlay their points on the same axes
+    for i, model in enumerate(models):
+        preds = model.predict(X_test)
+        # Scatter the dots for this model
+        plt.scatter(
+            x=Y_test, 
+            y=preds, 
+            alpha=0.6,          # Sligthly transparent
+            color=colors[i], 
+            edgecolor='none',   # Removing edges is crucial for overlapping massive data
+            label=labels[i]
+        )
+
+    plt.title('Overlapping Model Comparison: Actual vs. Predicted')
+    plt.xlabel('Actual Critical Temperature (Kelvin)')
+    plt.ylabel('Predicted Critical Temperature (Kelvin)')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+def pca_trainning(X_train_scaled,Y_train,components=2):
+    pca_vis = PCA(n_components=components)
+    X_train_pca_vis = pca_vis.fit_transform(X_train_scaled)
+    ev_vis = pca_vis.explained_variance_ratio_
+    print(f"\nVisualization PCA - PC1: {ev_vis[0]:.2%}, PC2: {ev_vis[1]:.2%}, Total: {ev_vis.sum():.2%}")
+    pca_df = pd.DataFrame(X_train_pca_vis, columns=['PC1', 'PC2'])
+    pca_df['cfinal'] = Y_train.values
+    return pca_df,ev_vis
